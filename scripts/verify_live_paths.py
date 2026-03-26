@@ -22,7 +22,12 @@ def verify_http_paths() -> None:
     with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
         for route in routes:
             response = client.get(route)
-            print("HTTP", route, response.status_code, response.headers.get("content-type", ""))
+            print(
+                "HTTP",
+                route,
+                response.status_code,
+                response.headers.get("content-type", ""),
+            )
 
         html = client.get("/").text
         required_ids = [

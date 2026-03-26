@@ -6,7 +6,9 @@ from src.server import app
 
 @pytest.mark.asyncio
 async def test_api_run_integration() -> None:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/run")
 
     assert response.status_code == 200
@@ -20,6 +22,8 @@ async def test_api_run_integration() -> None:
     inferred_total = sum(len(step["new_facts_from_inference"]) for step in steps)
     assert inferred_total >= 5
 
-    actions = [step["action_taken"] for step in steps if step["action_taken"] is not None]
+    actions = [
+        step["action_taken"] for step in steps if step["action_taken"] is not None
+    ]
     for previous, current in zip(actions, actions[1:], strict=False):
         assert previous != current

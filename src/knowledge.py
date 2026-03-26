@@ -101,7 +101,9 @@ class InferenceEngine:
         binding: dict[str, str],
     ) -> dict[str, str] | None:
         updated_binding = dict(binding)
-        for token, value in zip(pattern, (fact.subject, fact.predicate, fact.object), strict=True):
+        for token, value in zip(
+            pattern, (fact.subject, fact.predicate, fact.object), strict=True
+        ):
             if token.startswith("?"):
                 existing = updated_binding.get(token)
                 if existing is None:

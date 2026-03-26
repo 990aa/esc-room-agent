@@ -27,7 +27,9 @@ def test_run_full_game_step_count_is_deterministic() -> None:
 
 def test_planner_never_repeats_same_action_consecutively() -> None:
     results = run_full_game()
-    action_sequence = [step.action_taken for step in results if step.action_taken is not None]
+    action_sequence = [
+        step.action_taken for step in results if step.action_taken is not None
+    ]
 
     for previous, current in zip(action_sequence, action_sequence[1:], strict=False):
         assert previous != current
