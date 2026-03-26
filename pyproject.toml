@@ -12,3 +12,6 @@ dependencies = [
     "uvicorn[standard]>=0.42.0",
     "websockets>=16.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
