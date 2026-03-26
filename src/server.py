@@ -4,7 +4,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 
 from src.agent import EscapeRoomAgent, StepResult, fact_to_dict, run_full_game
@@ -21,17 +21,18 @@ app = FastAPI(title="Escape Room Agent")
 def get_index() -> FileResponse:
 	index_file = STATIC_DIR / "index.html"
 	if not index_file.exists():
-		return FileResponse(path=str(index_file), status_code=404)
+		raise HTTPException(status_code=404, detail="index.html not found")
 	return FileResponse(path=str(index_file))
 
 
 @app.get("/static/{file_path:path}")
 def get_static_file(file_path: str) -> FileResponse:
+	root = STATIC_DIR.resolve()
 	requested = (STATIC_DIR / file_path).resolve()
-	if STATIC_DIR.resolve() not in requested.parents and requested != STATIC_DIR.resolve():
-		return FileResponse(path=str(STATIC_DIR / "index.html"), status_code=404)
+	if root not in requested.parents and requested != root:
+		raise HTTPException(status_code=404, detail="File not found")
 	if not requested.exists() or not requested.is_file():
-		return FileResponse(path=str(STATIC_DIR / "index.html"), status_code=404)
+		raise HTTPException(status_code=404, detail="File not found")
 	return FileResponse(path=str(requested))
 
 
