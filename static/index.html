@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Escape Room Agent Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Manrope:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="layout-grid">
+        <section class="room-column panel-frame">
+          <header class="section-head">
+            <h1>Escape Room</h1>
+            <p>Room map updates every reasoning step</p>
+          </header>
+          <div id="room-map" class="room-map" aria-live="polite">
+            <svg id="relation-layer" class="relation-layer" aria-hidden="true"></svg>
+          </div>
+        </section>
+
+        <section class="mind-column panel-frame">
+          <header class="section-head">
+            <h2>Agent Mind</h2>
+            <p>Observable and explainable reasoning</p>
+          </header>
+          <div class="mind-sections">
+            <article class="mind-block">
+              <h3>Observed facts</h3>
+              <ul id="observed-facts" class="fact-list"></ul>
+            </article>
+            <article class="mind-block">
+              <h3>Inferred facts</h3>
+              <ul id="inferred-facts" class="fact-list"></ul>
+            </article>
+            <article class="mind-block this-step">
+              <h3>This step</h3>
+              <div id="this-step"></div>
+            </article>
+            <article class="mind-block narrative">
+              <h3>Step-by-step narrative</h3>
+              <div id="history-strip" class="history-strip"></div>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <footer class="controls panel-frame">
+        <button id="step-btn" class="btn primary" type="button">Step</button>
+        <label class="toggle-wrap" for="autoplay-toggle">
+          <input id="autoplay-toggle" type="checkbox" />
+          <span>Auto-play</span>
+        </label>
+        <label class="speed-wrap" for="speed-slider">
+          <span>Speed</span>
+          <input id="speed-slider" type="range" min="300" max="2000" step="100" value="900" />
+          <output id="speed-output">900ms</output>
+        </label>
+        <button id="reset-btn" class="btn secondary" type="button">Reset</button>
+      </footer>
+    </div>
+
+    <div id="win-overlay" class="win-overlay hidden" aria-live="assertive">
+      <div class="overlay-card">
+        <h2>Agent escaped!</h2>
+        <p id="win-meta"></p>
+      </div>
+      <div id="confetti-layer" class="confetti-layer" aria-hidden="true"></div>
+    </div>
+
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>
