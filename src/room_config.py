@@ -55,7 +55,7 @@ def build_room() -> Room:
         RoomObject(
             id="lock_B",
             kind="lock",
-            state={"target": "drawer_B", "uses_key": "key_red", "open": False},
+            state={"target": "drawer_B", "open": False},
             position={"x": 42.0, "y": 24.0},
         ),
         RoomObject(

@@ -56,8 +56,10 @@ class InferenceEngine:
     def __init__(self, knowledge_base: KnowledgeBase, rules: list[Rule]) -> None:
         self.kb = knowledge_base
         self.rules = rules
+        self.last_inference_trace: list[tuple[str, Fact]] = []
 
     def run_forward_chaining(self) -> list[Fact]:
+        self.last_inference_trace = []
         inferred_facts: list[Fact] = []
         changed = True
 
@@ -68,6 +70,7 @@ class InferenceEngine:
                     conclusion = self._instantiate(rule.conclusion, binding)
                     if self.kb.add_fact(conclusion):
                         inferred_facts.append(conclusion)
+                        self.last_inference_trace.append((rule.name, conclusion))
                         changed = True
 
         return inferred_facts
