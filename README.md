@@ -7,32 +7,6 @@ The key idea is observability:
 - The knowledge base grows from both perception and inference.
 - The UI shows exactly what was observed, what was inferred, and what is planned next.
 
-## Project Structure
-
-```text
-src/
-	knowledge.py      # Fact triples, KB, rules, forward chaining
-	rules.py          # Rule set used by inference engine
-	room.py           # RoomObject, Room, ClueDecoder
-	room_config.py    # Concrete room layout and initial state
-	agent.py          # Perception, Planner, ActionExecutor, EscapeRoomAgent
-	server.py         # FastAPI + WebSocket API
-tests/
-	test_knowledge.py
-	test_room.py
-	test_agent.py
-	test_integration.py
-static/
-	index.html
-	styles.css
-	app.ts            # Frontend source (TypeScript file)
-	app.js            # Browser-loaded module
-scripts/
-	run_tests.sh      # Full test pass command
-pyproject.toml
-tsconfig.json
-```
-
 ## Architecture Overview
 
 The system has four layers:
