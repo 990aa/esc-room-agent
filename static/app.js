@@ -1,3 +1,5 @@
+export {};
+
 const roomMap = document.getElementById("room-map");
 const relationLayer = document.getElementById("relation-layer");
 const observedFactsList = document.getElementById("observed-facts");

@@ -1,3 +1,5 @@
+export {};
+
 type Fact = {
   subject: string;
   predicate: string;
