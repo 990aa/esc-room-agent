@@ -1,19 +1,31 @@
 export {};
 
-const roomMap = document.getElementById("room-map");
-const relationLayer = document.getElementById("relation-layer");
-const observedFactsList = document.getElementById("observed-facts");
-const inferredFactsList = document.getElementById("inferred-facts");
-const thisStepPanel = document.getElementById("this-step");
-const historyStrip = document.getElementById("history-strip");
-const stepButton = document.getElementById("step-btn");
-const resetButton = document.getElementById("reset-btn");
-const autoPlayToggle = document.getElementById("autoplay-toggle");
-const speedSlider = document.getElementById("speed-slider");
-const speedOutput = document.getElementById("speed-output");
-const winOverlay = document.getElementById("win-overlay");
-const winMeta = document.getElementById("win-meta");
-const confettiLayer = document.getElementById("confetti-layer");
+function requireElement(id) {
+  const element = document.getElementById(id);
+  if (!element) {
+    throw new Error(`Missing required element: ${id}`);
+  }
+  return element;
+}
+
+const roomMap = requireElement("room-map");
+const roomCanvas = requireElement("room-canvas");
+const relationLayer = requireElement("relation-layer");
+const inferenceLayer = requireElement("inference-layer");
+const observedFactsList = requireElement("observed-facts");
+const inferredFactsList = requireElement("inferred-facts");
+const thisStepPanel = requireElement("this-step");
+const historyStrip = requireElement("history-strip");
+const stepButton = requireElement("step-btn");
+const slowStepButton = requireElement("slow-step-btn");
+const resetButton = requireElement("reset-btn");
+const autoPlayToggle = requireElement("autoplay-toggle");
+const highlightToggle = requireElement("highlight-toggle");
+const speedSlider = requireElement("speed-slider");
+const speedOutput = requireElement("speed-output");
+const winOverlay = requireElement("win-overlay");
+const winMeta = requireElement("win-meta");
+const confettiLayer = requireElement("confetti-layer");
 
 const appState = {
   socket: null,
@@ -25,6 +37,8 @@ const appState = {
   autoplayHandle: null,
   autoplayDelayMs: Number(speedSlider.value),
   winStepShown: -1,
+  pendingSlowStep: false,
+  slowStepInFlight: false,
 };
 
 function connectWebSocket() {
@@ -43,6 +57,7 @@ function connectWebSocket() {
 }
 
 function handlePayload(payload) {
+  const previousPayload = appState.payload;
   if (appState.payload) {
     appState.previousObjects = mapById(appState.payload.room.objects);
   }
@@ -50,11 +65,20 @@ function handlePayload(payload) {
   appState.payload = payload;
 
   if (payload.step === 0) {
-    appState.observedRenderCount = 0;
-    appState.inferredRenderCount = 0;
-    appState.seenNarrativeSteps.clear();
-    historyStrip.innerHTML = "";
-    hideWinOverlay();
+    resetVisualState();
+    render(payload);
+    return;
+  }
+
+  if (
+    appState.pendingSlowStep
+    && !appState.slowStepInFlight
+    && previousPayload
+    && payload.step > previousPayload.step
+  ) {
+    appState.pendingSlowStep = false;
+    void runSlowStepSequence(payload);
+    return;
   }
 
   render(payload);
@@ -64,14 +88,15 @@ function handlePayload(payload) {
 function render(payload) {
   renderRoom(payload.room.objects);
   renderObservedFacts(payload.observed_facts);
-  renderInferredFacts(payload.inferred_facts);
+  const newInferredFacts = renderInferredFacts(payload.inferred_facts);
+  animateInferenceHighlights(newInferredFacts, payload);
   renderThisStep(payload);
   renderWinState(payload);
 }
 
 function renderRoom(objects) {
   const fragment = document.createDocumentFragment();
-  roomMap.querySelectorAll(".room-object").forEach((node) => node.remove());
+  roomCanvas.querySelectorAll(".room-object").forEach((node) => node.remove());
 
   for (const object of objects) {
     const card = document.createElement("article");
@@ -111,7 +136,7 @@ function renderRoom(objects) {
     fragment.appendChild(card);
   }
 
-  roomMap.appendChild(fragment);
+  roomCanvas.appendChild(fragment);
   drawRelations(objects);
 }
 
@@ -157,8 +182,8 @@ function summarizeState(object) {
 function drawRelations(objects) {
   relationLayer.innerHTML = "";
   const objectMap = mapById(objects);
-  const width = roomMap.clientWidth;
-  const height = roomMap.clientHeight;
+  const width = roomCanvas.clientWidth;
+  const height = roomCanvas.clientHeight;
 
   const relations = [];
   for (const object of objects) {
@@ -196,6 +221,141 @@ function drawRelations(objects) {
   }
 }
 
+function animateInferenceHighlights(newInferredFacts, payload) {
+  if (!highlightToggle.checked || newInferredFacts.length === 0) {
+    return;
+  }
+
+  const objectMap = mapById(payload.room.objects);
+  const allFacts = payload.observed_facts.concat(payload.inferred_facts.map((item) => item.fact));
+
+  for (const inferred of newInferredFacts) {
+    const arcs = deriveInferenceArcs(inferred, allFacts);
+    if (arcs.length === 0) {
+      continue;
+    }
+    for (const arc of arcs) {
+      drawInferenceArc(objectMap, arc.from, arc.to, inferred.rule_name);
+    }
+  }
+}
+
+function deriveInferenceArcs(inferred, allFacts) {
+  const arcs = [];
+  const fact = inferred.fact;
+
+  if (inferred.rule_name === "panel_can_be_opened_when_code_matches") {
+    const panelNeedsCode = allFacts.find(
+      (item) => item.subject === fact.subject && item.predicate === "needs_code",
+    );
+    if (!panelNeedsCode) {
+      return arcs;
+    }
+    const clueCodeFact = allFacts.find(
+      (item) => item.predicate === "says_code" && item.object === panelNeedsCode.object,
+    );
+    if (clueCodeFact) {
+      arcs.push({ from: clueCodeFact.subject, to: fact.subject });
+    }
+    return arcs;
+  }
+
+  if (inferred.rule_name === "clue_available_when_container_open") {
+    const container = allFacts.find(
+      (item) => item.predicate === "contains" && item.object === fact.subject,
+    );
+    if (container) {
+      arcs.push({ from: container.subject, to: fact.subject });
+    }
+    return arcs;
+  }
+
+  if (inferred.rule_name === "lock_openable_with_available_key") {
+    const lockUsesKey = allFacts.find(
+      (item) => item.subject === fact.subject && item.predicate === "uses_key",
+    );
+    if (lockUsesKey) {
+      arcs.push({ from: lockUsesKey.object, to: fact.subject });
+    }
+    return arcs;
+  }
+
+  if (inferred.rule_name === "exit_reachable_when_required_lock_open") {
+    const requiredLock = allFacts.find(
+      (item) => item.subject === fact.subject && item.predicate === "requires_lock",
+    );
+    if (requiredLock) {
+      arcs.push({ from: requiredLock.object, to: fact.subject });
+    }
+    return arcs;
+  }
+
+  if (inferred.rule_name === "available_unread_clue_should_be_examined") {
+    arcs.push({ from: fact.subject, to: fact.subject });
+    return arcs;
+  }
+
+  return arcs;
+}
+
+function drawInferenceArc(objectMap, fromId, toId, ruleName) {
+  const fromObject = objectMap.get(fromId);
+  const toObject = objectMap.get(toId);
+  if (!fromObject || !toObject) {
+    return;
+  }
+
+  const width = roomCanvas.clientWidth;
+  const height = roomCanvas.clientHeight;
+  const from = roomCenter(fromObject, width, height);
+  const to = roomCenter(toObject, width, height);
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.classList.add("inference-arc-path");
+
+  let labelX = from.x;
+  let labelY = from.y - 14;
+
+  if (fromId === toId) {
+    const radius = 26;
+    path.setAttribute(
+      "d",
+      `M ${from.x - radius} ${from.y} A ${radius} ${radius} 0 1 1 ${from.x + radius} ${from.y}`,
+    );
+  } else {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const normalX = -dy / length;
+    const normalY = dx / length;
+    const bend = Math.min(74, 24 + length * 0.13);
+    const controlX = (from.x + to.x) / 2 + normalX * bend;
+    const controlY = (from.y + to.y) / 2 + normalY * bend;
+    labelX = controlX;
+    labelY = controlY - 10;
+    path.setAttribute("d", `M ${from.x} ${from.y} Q ${controlX} ${controlY} ${to.x} ${to.y}`);
+  }
+
+  const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  label.classList.add("inference-arc-label");
+  label.setAttribute("x", String(labelX));
+  label.setAttribute("y", String(labelY));
+  label.textContent = ruleName;
+
+  inferenceLayer.append(path, label);
+  window.setTimeout(() => {
+    path.remove();
+    label.remove();
+  }, 2000);
+}
+
+function roomCenter(object, width, height) {
+  return {
+    x: (object.position.x / 100) * width,
+    y: (object.position.y / 100) * height,
+  };
+}
+
 function renderObservedFacts(facts) {
   if (facts.length < appState.observedRenderCount) {
     observedFactsList.innerHTML = "";
@@ -213,6 +373,8 @@ function renderObservedFacts(facts) {
 }
 
 function renderInferredFacts(facts) {
+  const newInferred = [];
+
   if (facts.length < appState.inferredRenderCount) {
     inferredFactsList.innerHTML = "";
     appState.inferredRenderCount = 0;
@@ -224,11 +386,14 @@ function renderInferredFacts(facts) {
     item.className = "fact-item slide-in";
     item.textContent = `${inferred.rule_name}: ${factSentence(inferred.fact)}`;
     inferredFactsList.appendChild(item);
+    newInferred.push(inferred);
     appState.inferredRenderCount += 1;
   }
+
+  return newInferred;
 }
 
-function renderThisStep(payload) {
+function renderThisStep(payload, phaseLabel = null) {
   const actionText = payload.action_taken
     ? `${payload.action_taken.action} ${payload.action_taken.target}`
     : "none";
@@ -242,6 +407,7 @@ function renderThisStep(payload) {
   thisStepPanel.innerHTML = "";
 
   const lines = [
+    `Phase: ${phaseLabel || "Complete"}`,
     `Action taken: ${actionText}`,
     `New observed facts: ${observed || "none"}`,
     `New inferred facts: ${inferred || "none"}`,
@@ -271,6 +437,7 @@ function renderWinState(payload) {
 function hideWinOverlay() {
   winOverlay.classList.add("hidden");
   confettiLayer.innerHTML = "";
+  inferenceLayer.innerHTML = "";
   appState.winStepShown = -1;
 }
 
@@ -338,14 +505,73 @@ function sendCommand(command) {
   socket.send(JSON.stringify({ command }));
 }
 
+function resetVisualState() {
+  appState.observedRenderCount = 0;
+  appState.inferredRenderCount = 0;
+  appState.seenNarrativeSteps.clear();
+  appState.pendingSlowStep = false;
+  appState.slowStepInFlight = false;
+  historyStrip.innerHTML = "";
+  observedFactsList.innerHTML = "";
+  inferredFactsList.innerHTML = "";
+  hideWinOverlay();
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+}
+
+async function runSlowStepSequence(payload) {
+  if (appState.slowStepInFlight) {
+    return;
+  }
+
+  appState.slowStepInFlight = true;
+  renderRoom(payload.room.objects);
+
+  renderThisStep(payload, "Perceiving...");
+  await delay(600);
+
+  renderObservedFacts(payload.observed_facts);
+  renderThisStep(payload, "Inferring...");
+  await delay(600);
+
+  const newInferredFacts = renderInferredFacts(payload.inferred_facts);
+  animateInferenceHighlights(newInferredFacts, payload);
+  renderThisStep(payload, "Planning...");
+  await delay(600);
+
+  renderThisStep(payload, "Acting...");
+  renderWinState(payload);
+  addNarrativeIfNeeded(payload);
+  appState.slowStepInFlight = false;
+}
+
 function configureControls() {
   stepButton.addEventListener("click", () => {
+    if (appState.slowStepInFlight) {
+      return;
+    }
+    sendCommand("step");
+  });
+
+  slowStepButton.addEventListener("click", () => {
+    if (appState.slowStepInFlight) {
+      return;
+    }
+    stopAutoplay();
+    autoPlayToggle.checked = false;
+    appState.pendingSlowStep = true;
     sendCommand("step");
   });
 
   resetButton.addEventListener("click", () => {
     stopAutoplay();
     autoPlayToggle.checked = false;
+    appState.pendingSlowStep = false;
+    appState.slowStepInFlight = false;
     sendCommand("reset");
   });
 
@@ -374,6 +600,9 @@ function startAutoplay() {
     if (appState.payload?.game_won) {
       stopAutoplay();
       autoPlayToggle.checked = false;
+      return;
+    }
+    if (appState.slowStepInFlight) {
       return;
     }
     sendCommand("step");
