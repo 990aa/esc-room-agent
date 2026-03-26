@@ -43,7 +43,11 @@ type StepPayload = {
 };
 
 const roomMap = document.getElementById("room-map") as HTMLDivElement;
-const relationLayer = document.getElementById("relation-layer") as SVGSVGElement;
+const relationLayerNode = document.getElementById("relation-layer");
+if (!(relationLayerNode instanceof SVGSVGElement)) {
+  throw new Error("Missing relation-layer SVG element");
+}
+const relationLayer = relationLayerNode;
 const observedFactsList = document.getElementById("observed-facts") as HTMLUListElement;
 const inferredFactsList = document.getElementById("inferred-facts") as HTMLUListElement;
 const thisStepPanel = document.getElementById("this-step") as HTMLDivElement;
