@@ -21,7 +21,10 @@
             <p>Room map updates every reasoning step</p>
           </header>
           <div id="room-map" class="room-map" aria-live="polite">
-            <svg id="relation-layer" class="relation-layer" aria-hidden="true"></svg>
+            <div id="room-canvas" class="room-canvas">
+              <svg id="relation-layer" class="relation-layer" aria-hidden="true"></svg>
+              <svg id="inference-layer" class="inference-layer" aria-hidden="true"></svg>
+            </div>
           </div>
         </section>
 
@@ -53,9 +56,14 @@
 
       <footer class="controls panel-frame">
         <button id="step-btn" class="btn primary" type="button">Step</button>
+        <button id="slow-step-btn" class="btn tertiary" type="button">Slow Step</button>
         <label class="toggle-wrap" for="autoplay-toggle">
           <input id="autoplay-toggle" type="checkbox" />
           <span>Auto-play</span>
+        </label>
+        <label class="toggle-wrap" for="highlight-toggle">
+          <input id="highlight-toggle" type="checkbox" checked />
+          <span>Highlight inference</span>
         </label>
         <label class="speed-wrap" for="speed-slider">
           <span>Speed</span>
